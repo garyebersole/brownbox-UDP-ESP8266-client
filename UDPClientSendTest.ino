@@ -39,37 +39,40 @@ int connection_ms;
 int message_sent_ms;
 
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
   Serial.println();
   Serial.println("=========================");
   awake_ms = millis();
   Serial.printf("%i\n", awake_ms);
-  // Connect to WiFi access point
-  WiFi.config(componentStaticIp, accessPointGateway, accessPointSubnetMask); // static only
-  WiFi.begin(SSID, PASSPHRASE);
-  Serial.print("Connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    if (CONNECTION_WAIT_TIMES++ < CONNECTION_MAX_WAIT_TRIES) {
-      delay(CONNECTION_WAIT_DELAY_MS);
-      Serial.print(".");
-    } else {
-      Serial.println("Failed to connect...resetting");
-      delay(1000);
-      ESP.reset();
+  // Connect to WiFi access point after setting static IP configuration
+  if (WiFi.config(componentStaticIp, accessPointGateway, accessPointSubnetMask)) {
+    Serial.println("Static IP configuration set");
+    WiFi.begin(SSID, PASSPHRASE);
+    Serial.print("Connecting");
+    while (WiFi.status() != WL_CONNECTED) {
+      if (CONNECTION_WAIT_TIMES++ < CONNECTION_MAX_WAIT_TRIES) {
+        delay(CONNECTION_WAIT_DELAY_MS);
+        Serial.print(".");
+      } else {
+        Serial.println("Failed to connect...resetting");
+        delay(1000);
+        ESP.reset();
+      }
     }
+    // Connected to AP
+    connection_ms = millis();
+    Serial.println();
+    Serial.printf("Connected at %i ms\n", connection_ms);
+    sprintf(udpPacket, "Awake: %ims / Connected: %ims", awake_ms, connection_ms);
+    Udp.beginPacket("172.24.1.1", 41234);  // Send this to the listener on the Pi
+    Udp.write(udpPacket);
+    Udp.endPacket();
+    Serial.printf("Sent message at %i ms\n", millis());
+  } else {
+    Serial.println("Failed to configure static IP");
   }
-  // Connected to AP
-  connection_ms = millis();
-  Serial.println();
-  Serial.printf("Connected at %i ms\n", connection_ms);
-  sprintf(udpPacket, "Awake: %ims / Connected: %ims", awake_ms, connection_ms);
-  Udp.beginPacket("172.24.1.1", 41234);  // Send this to the listener on the Pi
-  Udp.write(udpPacket);
-  Udp.endPacket();
-  message_sent_ms = millis();
-  Serial.printf("Sent message at %i ms\n", millis());
-  delay(100);  // allow sufficient time for packet to be fired before reset
-  ESP.reset();
+  //delay(100);  // allow sufficient time for packet to be fired before reset
+  //ESP.reset();
 }
 
 void loop() {}
